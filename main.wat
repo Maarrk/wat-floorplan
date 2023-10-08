@@ -1,37 +1,47 @@
-
 (module
   (memory 1)
   (global $pointSize i32 (i32.const 16)) ;; two doubles
 
-  (func $invSqrt
-    (param $x f64)
+  (func $pointsDistance
+    (param $pointsAddr i32)
+    (param $pointIdx1 i32)
+    (param $pointIdx2 i32)
     (result f64)
-    (local $y f64)
+    (local $x1 f64)
+    (local $y1 f64)
+    (local $x2 f64)
+    (local $y2 f64)
+    (local $dx f64)
+    (local $dy f64)
 
-    ;; evil floating point bit level hacking
-    ;; y = MAGIC - (x >> 1)
-    (local.set $y
-      (f64.reinterpret_i64
-        (i64.sub
-          (i64.const 0x5FE6EB50C7B537A9)
-          (i64.shr_u (i64.reinterpret_f64 (local.get $x)) (i64.const 1)))))
+    ;; x1 = points[pointIdx1];
+    (local.set $x1 (f64.load
+      (i32.add (local.get $pointsAddr)
+        (i32.mul (local.get $pointIdx1) (global.get $pointSize)))))
+    (local.set $y1 (f64.load
+      (i32.add (local.get $pointsAddr)
+        (i32.add (i32.const 8) ;; sizeof double
+          (i32.mul (local.get $pointIdx1) (global.get $pointSize))))))
+    (local.set $x2 (f64.load
+      (i32.add (local.get $pointsAddr)
+        (i32.mul (local.get $pointIdx2) (global.get $pointSize)))))
+    (local.set $y2 (f64.load
+      (i32.add (local.get $pointsAddr)
+        (i32.add (i32.const 8) ;; sizeof double
+          (i32.mul (local.get $pointIdx2) (global.get $pointSize))))))
 
-    ;; Newton's algorithm
-    ;; y = y * (1.5 - (x * 0.5) * (y * y))
-    (local.set $y
-      (f64.mul (local.get $y)
-        (f64.sub (f64.const 1.5)
-          (f64.mul
-            (f64.mul (local.get $x) (f64.const 0.5))
-            (f64.mul (local.get $y) (local.get $y))))))
-    (local.set $y
-      (f64.mul (local.get $y)
-        (f64.sub (f64.const 1.5)
-          (f64.mul
-            (f64.mul (local.get $x) (f64.const 0.5))
-            (f64.mul (local.get $y) (local.get $y))))))
+    ;; dx = x2 - x1
+    (local.set $dx (f64.sub
+      (local.get $x2)
+      (local.get $x1)))
+    (local.set $dy (f64.sub
+      (local.get $y2)
+      (local.get $y1)))
 
-    (return (local.get $y)))
+    ;; sqrt(dx * dx + dy * dy)
+    (return (f64.sqrt (f64.add
+      (f64.mul (local.get $dx) (local.get $dx))
+      (f64.mul (local.get $dy) (local.get $dy))))))
 
   (func $main
     (result i32)
@@ -42,7 +52,25 @@
     (local.set $pointsLen (i32.const 0))
 
     (return (i32.const 0)))
-
   (export "main" (func $main))
-  (export "invSqrt" (func $invSqrt))
+
+  (func $testPythagoreanDist
+    (result f64)
+
+    ;; &points = 0
+    ;; points = {
+    ;;   { 0.0, 0.0 },
+    ;;   { 3.0, 4.0 },
+    ;; }
+    (f64.store (i32.const 0) (f64.const 0.0))
+    (f64.store (i32.const 8) (f64.const 0.0))
+    (f64.store (i32.const 16) (f64.const 3.0))
+    (f64.store (i32.const 24) (f64.const 4.0))
+
+    (return (call $pointsDistance
+      (i32.const 0)
+      (i32.const 0)
+      (i32.const 1))))
+    (export "testPythagoreanDist" (func $testPythagoreanDist))
+
 )

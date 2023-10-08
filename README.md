@@ -1,5 +1,11 @@
 # wat-floorplan
 
+Include local config for git:
+
+```bash
+git config --local include.path ../.gitconfig
+```
+
 To install dependencies:
 
 ```bash

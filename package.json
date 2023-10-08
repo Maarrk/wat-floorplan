@@ -2,6 +2,9 @@
   "name": "wat-floorplan",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "test": "bun run wat_watcher.ts"
+  },
   "devDependencies": {
     "bun-types": "latest"
   },

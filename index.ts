@@ -1,7 +1,16 @@
-import { instantiate } from "./compile";
+import { compile, instantiate } from "./compile";
 
+await compile("main.wat", "main.wasm");
 const wasm = await instantiate();
 wasm.main();
-console.log(new Int32Array(wasm.memory.buffer));
-console.log("points", new Float64Array(wasm.memory.buffer, 0, 40));
-console.log("gradients", new Float64Array(wasm.memory.buffer, 8 * 40, 40));
+
+const points = new Float64Array(wasm.memory.buffer, 0, 40);
+const pointNames = ["A", "B", "C", "F", "G", "H", "A'", "B'", "C'", "G'"];
+
+console.log("name\tx\ty");
+for (let i = 0; i < pointNames.length; i++) {
+  const name = pointNames[i];
+  console.log(
+    `${name}\t${points[i * 2].toFixed(1)}\t${points[i * 2 + 1].toFixed(1)}`
+  );
+}

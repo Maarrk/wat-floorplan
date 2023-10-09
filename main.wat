@@ -339,30 +339,52 @@
       (i32.mul (global.get $constraintSize (i32.const 20))))) ;; max 20 constraints
     (local.set $dependentsLen (i32.const 0))
 
-    ;; points = { A, H, F, A' }
+    ;; points = { A, B, C, F, G, H, A', B', C', G' }
     (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
       (f64.const 0.0) (f64.const 0.0))) ;; point A
+    (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
+      (f64.const 0.0) (f64.const 1250.0))) ;; point B
+    (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
+      (f64.const 900.0) (f64.const 1250.0))) ;; point C
+    (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
+      (f64.const 1000.0) (f64.const 700.0))) ;; point F roughly
+    (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
+      (f64.const 1800.0) (f64.const 800.0))) ;; point G
     (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
       (f64.const 1785.0) ;; point H.x
       (f64.sub (f64.const 1252.0) (f64.const 1134.0)))) ;; H.y = AA' = AB - A'B
     (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
-      (f64.const 1000.0) (f64.const 700.0))) ;; point F roughly
+      (f64.const 0.0) (f64.sub (f64.const 1252.0) (f64.const 1134.0)))) ;; point A'
     (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
-      (f64.const 100.0) (f64.const 100.0))) ;; point A' roughly
+      (f64.const 0.0) (f64.const 1230.0))) ;; point B'
+    (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
+      (f64.const 880.0) (f64.const 1250.0))) ;; point C'
+    (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
+      (f64.const 1800.0) (f64.const 780.0))) ;; point G'
 
-    ;; measures = {
-    ;;   { AH: 1785 },
-    ;;   { AF: 1458 },
-    ;;   { FH:  928 },
-    ;; }
+    ;; measures
     (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
-      (i32.const 0) (i32.const 1) (f64.const 1785.0)))
+      (i32.const 1) (i32.const 2) (f64.const 909.0))) ;; BC
     (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
-      (i32.const 0) (i32.const 2) (f64.const 1458.0)))
+      (i32.const 0) (i32.const 1) (f64.const 1252.0))) ;; AB
     (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
-      (i32.const 1) (i32.const 2) (f64.const 928.0)))
+      (i32.const 0) (i32.const 8) (f64.const 1543.0))) ;; AC'
+    (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
+      (i32.const 0) (i32.const 3) (f64.const 1458.0))) ;; AF
+    (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
+      (i32.const 0) (i32.const 9) (f64.const 1961.0))) ;; AG'
+    (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
+      (i32.const 4) (i32.const 3) (f64.const 590.0))) ;; GF
+    (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
+      (i32.const 0) (i32.const 5) (f64.const 1785.0))) ;; AH
+    (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
+      (i32.const 7) (i32.const 5) (f64.const 2078.0))) ;; B'H
+    (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
+      (i32.const 3) (i32.const 5) (f64.const 928.0))) ;; FH
+    (local.set $measuresLen (call $addMeasure (local.get $measuresAddr) (local.get $measuresLen)
+      (i32.const 4) (i32.const 5) (f64.const 714.0))) ;; GH
 
-    ;; constraints = { A.x, A.y, H.y }
+    ;; constraints = { A.x, A.y, B.x }
     (i32.store (i32.add (local.get $constraintsAddr) (i32.mul (local.get $constraintsLen) (global.get $constraintSize)))
       (i32.const 0)) ;; A.x
     (local.set $constraintsLen (i32.add (local.get $constraintsLen) (i32.const 1)))
@@ -370,14 +392,23 @@
       (i32.const 1)) ;; A.y
     (local.set $constraintsLen (i32.add (local.get $constraintsLen) (i32.const 1)))
     (i32.store (i32.add (local.get $constraintsAddr) (i32.mul (local.get $constraintsLen) (global.get $constraintSize)))
-      (i32.const 3)) ;; H.y
+      (i32.const 2)) ;; B.x
     (local.set $constraintsLen (i32.add (local.get $constraintsLen) (i32.const 1)))
 
     ;; dependents = {
-    ;;   A' close to A towards F, 100 mm away
+    ;;   A' close to A towards B, 1252-1134 mm away
+    ;;   B' close to B towards A, 20 mm away
+    ;;   C' close to C towards B, 20 mm away
+    ;;   G' close to G towards H, 20 mm away
     ;; }
     (local.set $dependentsLen (call $addDependent (local.get $dependentsAddr) (local.get $dependentsLen)
-      (i32.const 3) (i32.const 0) (i32.const 2) (f64.const 100.0)))
+      (i32.const 6) (i32.const 0) (i32.const 1) (f64.sub (f64.const 1252.0) (f64.const 1134.0)))) ;; A'
+    (local.set $dependentsLen (call $addDependent (local.get $dependentsAddr) (local.get $dependentsLen)
+      (i32.const 7) (i32.const 1) (i32.const 0) (f64.const 20))) ;; B'
+    (local.set $dependentsLen (call $addDependent (local.get $dependentsAddr) (local.get $dependentsLen)
+      (i32.const 8) (i32.const 2) (i32.const 1) (f64.const 20))) ;; C'
+    (local.set $dependentsLen (call $addDependent (local.get $dependentsAddr) (local.get $dependentsLen)
+      (i32.const 9) (i32.const 4) (i32.const 5) (f64.const 20))) ;; G'
 
     ;; do N times {
     ;;   clear gradients

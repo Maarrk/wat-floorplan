@@ -42,21 +42,6 @@ describe("initial point positions", async () => {
     expect(points[0].x).toBe(0.0);
     expect(points[0].y).toBe(0.0);
   });
-
-  test("point H, y coordinate", async () => {
-    const wasm = await instantiate();
-    wasm.main();
-    const points = getPoints(wasm.memory, 3);
-    expect(points[1].y).toBeCloseTo(1252.0 - 1134.0);
-  });
-});
-
-test("point F moved", async () => {
-  const wasm = await instantiate();
-  wasm.main();
-  const points = getPoints(wasm.memory, 3);
-  expect(points[2].x).toBeCloseTo(1194, 0);
-  expect(points[2].y).toBeCloseTo(837, 0);
 });
 
 describe("pointsDistance()", async () => {

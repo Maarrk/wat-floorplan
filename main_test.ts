@@ -1,6 +1,5 @@
-import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { compile } from "./compile";
-import { instantiate } from "./index";
+import { beforeAll, describe, expect, test } from "bun:test";
+import { compile, instantiate } from "./compile";
 
 interface Point {
   x: number;

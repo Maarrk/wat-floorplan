@@ -1,11 +1,4 @@
-import { Main } from "./main";
-
-export async function instantiate() {
-  const buffer = await Bun.file("main.wasm").arrayBuffer();
-  const module = await WebAssembly.compile(buffer);
-  const instance = await WebAssembly.instantiate(module);
-  return instance.exports as unknown as Main;
-}
+import { instantiate } from "./compile";
 
 const wasm = await instantiate();
 wasm.main();

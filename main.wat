@@ -5,6 +5,7 @@
   (global $pointSize i32 (i32.const 16)) ;; f64, f64
   (global $measureSize i32 (i32.const 16)) ;; i32, i32, f64
   (global $constraintSize i32 (i32.const 4)) ;; i32
+  (global $dependentSize i32 (i32.const 20)) ;; i32, i32, i32, f64
 
   (func $pointCoordinates
     (param $pointsAddr i32) ;; array of {x: f64, y: f64}
@@ -99,6 +100,35 @@
 
     (return (i32.add (local.get $arrayLen) (i32.const 1))))
 
+  (func $addDependent
+    (param $array i32)
+    (param $arrayLen i32)
+    (param $pointIdx i32)
+    (param $neighborIdx i32)
+    (param $towardsIdx i32)
+    (param $neighborDistance f64)
+    (result i32) ;; new length of array
+    (local $structAddr i32)
+
+    (local.set $structAddr
+      (i32.add (local.get $array)
+        (i32.mul (local.get $arrayLen) (global.get $dependentSize))))
+
+    (i32.store
+      (i32.add (local.get $structAddr) (i32.const 0))
+      (local.get $pointIdx))
+    (i32.store
+      (i32.add (local.get $structAddr) (i32.const 4))
+      (local.get $neighborIdx))
+    (i32.store
+      (i32.add (local.get $structAddr) (i32.const 8))
+      (local.get $towardsIdx))
+    (f64.store
+      (i32.add (local.get $structAddr) (i32.const 12))
+      (local.get $neighborDistance))
+
+    (return (i32.add (local.get $arrayLen) (i32.const 1))))
+
   (func $updateGradient
     (param $pointsAddr i32)
     (param $gradientsAddr i32)
@@ -179,6 +209,94 @@
 
     (return))
 
+  (func $updateDependent
+    (param $pointsAddr i32)
+    (param $dependent i32) ;; address of { point: i32, neighbor: i32, towards: i32, distance: f64 }
+    (result)
+    (local $pointPosAddr i32) ;; address of currently modified coordinate of point
+    (local $neighborPosAddr i32)
+    (local $towardsPosAddr i32)
+    (local $neighborPos f64)
+    (local $posDelta f64)
+    (local $fullDistance f64)
+    (local $neighborDistance f64)
+
+    (local.set $fullDistance (call $pointsDistance (local.get $pointsAddr)
+      (i32.load (i32.add (local.get $dependent) (i32.const 4))) ;; neighborIdx
+      (i32.load (i32.add (local.get $dependent) (i32.const 8))) ;; towardsIdx
+    ))
+    (local.set $neighborDistance (f64.load
+      (i32.add (local.get $dependent) (i32.const 12)) ;; neighborDistance
+    ))
+
+    (local.set $pointPosAddr (i32.add (local.get $pointsAddr) (i32.mul (global.get $pointSize)
+      (i32.load (i32.add (local.get $dependent) (i32.const 0))) ;; pointIdx
+    )))
+    (local.set $neighborPosAddr (i32.add (local.get $pointsAddr) (i32.mul (global.get $pointSize)
+      (i32.load (i32.add (local.get $dependent) (i32.const 4))) ;; neighborIdx
+    )))
+    (local.set $towardsPosAddr (i32.add (local.get $pointsAddr) (i32.mul (global.get $pointSize)
+      (i32.load (i32.add (local.get $dependent) (i32.const 8))) ;; towardsIdx
+    )))
+
+    (local.set $neighborPos (f64.load (local.get $neighborPosAddr)))
+    (local.set $posDelta (f64.sub (f64.load (local.get $towardsPosAddr)) (local.get $neighborPos)))
+    (f64.store (local.get $pointPosAddr) (f64.add
+      (local.get $neighborPos)
+      (f64.mul
+        (local.get $neighborDistance)
+        (f64.div (local.get $posDelta) (local.get $fullDistance)))))
+
+    ;; do y coordinate: move all addresses 8 bytes up
+    (local.set $pointPosAddr (i32.add (local.get $pointPosAddr) (i32.const 8)))
+    (local.set $neighborPosAddr (i32.add (local.get $neighborPosAddr) (i32.const 8)))
+    (local.set $towardsPosAddr (i32.add (local.get $towardsPosAddr) (i32.const 8)))
+
+    (local.set $neighborPos (f64.load (local.get $neighborPosAddr)))
+    (local.set $posDelta (f64.sub (f64.load (local.get $towardsPosAddr)) (local.get $neighborPos)))
+    (f64.store (local.get $pointPosAddr) (f64.add
+      (local.get $neighborPos)
+      (f64.mul
+        (local.get $neighborDistance)
+        (f64.div (local.get $posDelta) (local.get $fullDistance)))))
+
+    (return))
+
+  (func $increaseGradient
+    (param $gradientsAddr i32) ;; array of {x: f64, y: f64}
+    (param $thisPointIdx i32) ;; index of increased gradient
+    (param $otherPointIdx i32) ;; index of gradient value to change by
+    (result)
+    (local $thisGradAddr i32)
+    (local $otherGradAddr i32)
+
+    (local.set $thisGradAddr (i32.add (local.get $gradientsAddr) (i32.mul (global.get $pointSize) (local.get $thisPointIdx))))
+    (local.set $otherGradAddr (i32.add (local.get $gradientsAddr) (i32.mul (global.get $pointSize) (local.get $otherPointIdx))))
+
+    ;; this = this + other
+    (f64.store (local.get $thisGradAddr) (f64.add (f64.load (local.get $thisGradAddr)) (f64.load (local.get $otherGradAddr))))
+
+    ;; do y coordinate: move all addresses 8 bytes up
+    (local.set $thisGradAddr (i32.add (local.get $thisGradAddr) (i32.const 8)))
+    (local.set $otherGradAddr (i32.add (local.get $otherGradAddr) (i32.const 8)))
+
+    (f64.store (local.get $thisGradAddr) (f64.add (f64.load (local.get $thisGradAddr)) (f64.load (local.get $otherGradAddr))))
+
+    (return))
+
+  (func $increaseNeighborGradient
+    (param $gradientsAddr i32) ;; array of {x: f64, y: f64}
+    (param $dependent i32) ;; address of { point: i32, neighbor: i32, towards: i32, distance: f64 }
+    (result)
+
+    (call $increaseGradient
+      (local.get $gradientsAddr)
+      (i32.load (i32.add (local.get $dependent) (i32.const 4))) ;; neighborIdx as this
+      (i32.load (i32.add (local.get $dependent) (i32.const 0))) ;; pointIdx as other
+      )
+
+    (return))
+
   (func $main
     (result i32) ;; exit code, 0 for success
 
@@ -193,6 +311,9 @@
     ;; constraints: i32[]
     (local $constraintsAddr i32)
     (local $constraintsLen i32)
+    ;; $dependents: {pointIdx: i32, neighborIdx: i32, towardsIdx: i32, neighborDistance: f64}[]
+    (local $dependentsAddr i32)
+    (local $dependentsLen i32)
 
     ;; loop counters
     (local $i i32)
@@ -214,8 +335,11 @@
     (local.set $constraintsAddr (i32.add (local.get $measuresAddr)
       (i32.mul (global.get $measureSize) (i32.const 40)))) ;; max 40 measures
     (local.set $constraintsLen (i32.const 0))
+    (local.set $dependentsAddr (i32.add (local.get $constraintsAddr)
+      (i32.mul (global.get $constraintSize (i32.const 20))))) ;; max 20 constraints
+    (local.set $dependentsLen (i32.const 0))
 
-    ;; points = { A, H, F }
+    ;; points = { A, H, F, A' }
     (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
       (f64.const 0.0) (f64.const 0.0))) ;; point A
     (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
@@ -223,6 +347,8 @@
       (f64.sub (f64.const 1252.0) (f64.const 1134.0)))) ;; H.y = AA' = AB - A'B
     (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
       (f64.const 1000.0) (f64.const 700.0))) ;; point F roughly
+    (local.set $pointsLen (call $addPoint (local.get $pointsAddr) (local.get $pointsLen)
+      (f64.const 100.0) (f64.const 100.0))) ;; point A' roughly
 
     ;; measures = {
     ;;   { AH: 1785 },
@@ -247,9 +373,17 @@
       (i32.const 3)) ;; H.y
     (local.set $constraintsLen (i32.add (local.get $constraintsLen) (i32.const 1)))
 
+    ;; dependents = {
+    ;;   A' close to A towards F, 100 mm away
+    ;; }
+    (local.set $dependentsLen (call $addDependent (local.get $dependentsAddr) (local.get $dependentsLen)
+      (i32.const 3) (i32.const 0) (i32.const 2) (f64.const 100.0)))
+
     ;; do N times {
     ;;   clear gradients
+    ;;   place dependent points
     ;;   foreach measure update gradients
+    ;;   foreach dependent add gradient to neighbor
     ;;   foreach constraint clear gradient
     ;;   foreach gradient move point a bit
     ;; }
@@ -266,6 +400,16 @@
         (local.set $j (i32.add (local.get $j) (i32.const 1)))
         (br_if $gradientLoop (i32.lt_s (local.get $j) (i32.mul (i32.const 2) (local.get $pointsLen)))))
 
+      ;; for (j = 0; j < dependentsLen; j++)
+      (local.set $j (i32.const 0))
+      (loop $dependentLoop
+
+        (call $updateDependent (local.get $pointsAddr)
+          (i32.add (local.get $dependentsAddr) (i32.mul (global.get $dependentSize) (local.get $j))))
+
+        (local.set $j (i32.add (local.get $j) (i32.const 1)))
+        (br_if $dependentLoop (i32.lt_s (local.get $j) (local.get $dependentsLen))))
+
       ;; for (j = 0; j < measuresLen; j++)
       (local.set $j (i32.const 0))
       (loop $measureLoop
@@ -275,6 +419,16 @@
 
         (local.set $j (i32.add (local.get $j) (i32.const 1)))
         (br_if $measureLoop (i32.lt_s (local.get $j) (local.get $measuresLen))))
+
+      ;; for (j = 0; j < dependentsLen; j++)
+      (local.set $j (i32.const 0))
+      (loop $dependentLoop
+
+        (call $increaseNeighborGradient (local.get $gradientsAddr)
+          (i32.add (local.get $dependentsAddr) (i32.mul (global.get $dependentSize) (local.get $j))))
+
+        (local.set $j (i32.add (local.get $j) (i32.const 1)))
+        (br_if $dependentLoop (i32.lt_s (local.get $j) (local.get $dependentsLen))))
 
       ;; for (j = 0; j < constraintsLen; j++)
       (local.set $j (i32.const 0))
